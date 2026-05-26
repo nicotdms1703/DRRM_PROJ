@@ -91,26 +91,78 @@
     <!-- 2. COMMAND CENTER (ALERT SYSTEM) -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="alert-edge edge-critical">
-            <span class="text-[10px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest">CRITICAL</span>
-            <h4 class="text-[14px] font-bold text-slate-800 dark:text-white mt-1">{{ low_stock_items }} Low Stock Alerts</h4>
-            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Replenishment needed for disaster response readiness.</p>
+            <span class="text-[10px] font-black text-red-600 dark:text-red-500 uppercase tracking-widest">🤖 AI ALERT</span>
+            <h4 class="text-[14px] font-bold text-slate-800 dark:text-white mt-1">{{ alerts_count }} Active Alerts</h4>
+            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">AI-generated restock recommendations.</p>
+            <a href="{% url 'ai_alerts' %}" class="text-[10px] font-bold text-red-600 hover:underline mt-2 inline-block">View All →</a>
         </div>
         <div class="alert-edge edge-warning">
-            <span class="text-[10px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest">WARNING</span>
-            <h4 class="text-[14px] font-bold text-slate-800 dark:text-white mt-1">High Forecast Variance</h4>
-            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Usage trends deviating from historical baseline metrics.</p>
+            <span class="text-[10px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest">📊 CONSUMPTION</span>
+            <h4 class="text-[14px] font-bold text-slate-800 dark:text-white mt-1">{{ most_consumed_items|length }} Top Items</h4>
+            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Most consumed this week identified.</p>
+            <a href="{% url 'consumption_analytics' %}" class="text-[10px] font-bold text-amber-600 hover:underline mt-2 inline-block">Details →</a>
         </div>
         <div class="alert-edge edge-info">
-            <span class="text-[10px] font-black text-blue-600 dark:text-blue-500 uppercase tracking-widest">INSIGHT</span>
-            <h4 class="text-[14px] font-bold text-slate-800 dark:text-white mt-1">{{ top_item_name|truncatechars:15 }} Peak</h4>
-            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Identified as the highest utility item category this period.</p>
+            <span class="text-[10px] font-black text-blue-600 dark:text-blue-500 uppercase tracking-widest">📦 DEPLOYMENT</span>
+            <h4 class="text-[14px] font-bold text-slate-800 dark:text-white mt-1">{{ borrowed_equipment }} Units</h4>
+            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Currently deployed in field operations.</p>
+            <a href="{% url 'borrowing' %}" class="text-[10px] font-bold text-blue-600 hover:underline mt-2 inline-block">Manage →</a>
         </div>
         <div class="alert-edge edge-success">
-            <span class="text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest">SUCCESS</span>
-            <h4 class="text-[14px] font-bold text-slate-800 dark:text-white mt-1">System Audit Clean</h4>
-            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Database synchronization across all units verified.</p>
+            <span class="text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest">📈 LOGISTICS</span>
+            {% if latest_logistics %}
+            <h4 class="text-[14px] font-bold text-slate-800 dark:text-white mt-1">{{ latest_logistics.logistics_efficiency_score|floatformat:0 }}% Efficient</h4>
+            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Monthly logistics performance score.</p>
+            {% else %}
+            <h4 class="text-[14px] font-bold text-slate-800 dark:text-white mt-1">Data Pending</h4>
+            <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Monthly analytics will be available soon.</p>
+            {% endif %}
+            <a href="{% url 'logistics_analytics' %}" class="text-[10px] font-bold text-emerald-600 hover:underline mt-2 inline-block">Analytics →</a>
         </div>
     </div>
+
+    <!-- 2.5 AI RESTOCK ALERTS (CRITICAL & HIGH) -->
+    {% if critical_alerts %}
+    <div class="space-y-4">
+        <div class="border-l-4 border-red-500 bg-red-50 dark:bg-red-900/10 p-4 rounded">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h3 class="text-sm font-bold text-red-700 dark:text-red-400">🚨 CRITICAL AI RESTOCK ALERTS</h3>
+                    <p class="text-[11px] text-red-600 dark:text-red-400 mt-1">The AI system has identified items requiring immediate restock action.</p>
+                </div>
+                <a href="{% url 'ai_alerts' %}" class="px-3 py-1 bg-red-600 text-white text-[10px] font-bold rounded hover:bg-red-700">View All</a>
+            </div>
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {% for alert in critical_alerts %}
+                <div class="bg-white dark:bg-slate-800 border border-red-200 dark:border-red-900 rounded p-3">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="text-[12px] font-bold text-slate-800 dark:text-white">{{ alert.item.name }}</h4>
+                            <p class="text-[10px] text-slate-500">{{ alert.item.item_code }}</p>
+                        </div>
+                        <span class="text-[9px] font-black px-2 py-1 rounded {% if alert.severity == 'CRITICAL' %}bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400{% else %}bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400{% endif %}">
+                            {{ alert.get_severity_display }}
+                        </span>
+                    </div>
+                    <div class="space-y-1 text-[10px] mb-3">
+                        <div class="flex justify-between"><span class="text-slate-500">Current:</span><span class="font-bold">{{ alert.current_quantity }} units</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Predicted (7d):</span><span class="font-bold">{{ alert.predicted_quantity }} units</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Recommended:</span><span class="font-bold text-emerald-600">{{ alert.recommended_restock }} units</span></div>
+                        {% if alert.predicted_stockout_date %}
+                        <div class="flex justify-between"><span class="text-slate-500">Stockout:</span><span class="font-bold text-red-600">{{ alert.predicted_stockout_date }}</span></div>
+                        {% endif %}
+                    </div>
+                    <p class="text-[9px] text-slate-600 dark:text-slate-400 mb-2">{{ alert.reason|truncatechars:60 }}</p>
+                    <div class="flex gap-2">
+                        <button onclick="acknowledgeAlert({{ alert.id }})" class="flex-1 text-[9px] font-bold py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded hover:bg-blue-200">ACK</button>
+                        <button onclick="markRestocked({{ alert.id }})" class="flex-1 text-[9px] font-bold py-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded hover:bg-emerald-200">Restocked</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- 3. ANALYTICS & INSIGHTS -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -266,5 +318,59 @@
             plugins: { legend: { display: false } }
         }
     });
+
+    // AI Alert Management Functions
+    function acknowledgeAlert(alertId) {
+        fetch('/api/ai/acknowledge-alert/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ alert_id: alertId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        });
+    }
+
+    function markRestocked(alertId) {
+        fetch('/api/ai/mark-restocked/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ alert_id: alertId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        });
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
 </script>
 {% endblock %}

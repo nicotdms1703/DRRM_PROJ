@@ -81,19 +81,20 @@
                         <!-- Stock Adjustment -->
                         <div class="space-y-3">
                             <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Inventory Adjustment</h4>
-                            <form action="{% url 'stock_manage' %}" method="POST" class="flex items-center space-x-2">
+                            <form id="item-adjust-form" action="{% url 'stock_manage' %}" method="POST" class="flex items-center space-x-2">
                                 {% csrf_token %}
                                 <input type="hidden" name="item_id" value="{{ item.id }}">
-                                <select name="type" class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] font-bold uppercase rounded p-2 outline-none">
+                                <select id="item-adjust-type" name="type" class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] font-bold uppercase rounded p-2 outline-none">
                                     <option value="IN">IN</option>
                                     <option value="OUT">OUT</option>
                                 </select>
-                                <input type="number" name="quantity" value="1" min="1" class="w-16 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-bold rounded p-2 outline-none">
+                                <input id="item-adjust-qty" type="number" name="quantity" value="1" min="1" class="w-16 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm font-bold rounded p-2 outline-none">
                                 <input type="text" name="remarks" placeholder="Remarks..." class="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] rounded p-2 outline-none">
                                 <button type="submit" class="p-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
                                 </button>
                             </form>
+                            <p id="item-adjust-hint" class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Use the form above to add or remove stock. For stock in, respect the capacity if configured.</p>
                         </div>
 
                         <!-- Borrowing Authorization -->
@@ -163,7 +164,13 @@
                                     </span>
                                 </td>
                                 <td class="font-bold text-slate-700 dark:text-white">{{ tx.quantity }}</td>
-                                <td class="text-slate-600 dark:text-slate-400 text-xs">{{ tx.user.username|default:"System" }}</td>
+                                <td class="text-slate-600 dark:text-slate-400 text-xs">
+                                    {% if tx.user %}
+                                        {{ tx.user.get_full_name|default:tx.user.username }}
+                                    {% else %}
+                                        System
+                                    {% endif %}
+                                </td>
                                 <td class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{{ tx.timestamp|date:"M d, H:i" }}</td>
                             </tr>
                             {% empty %}
@@ -179,6 +186,44 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+    (function() {
+        const adjustType = document.getElementById('item-adjust-type');
+        const adjustQty = document.getElementById('item-adjust-qty');
+        const adjustHint = document.getElementById('item-adjust-hint');
+        const currentQty = Number('{{ item.quantity }}');
+        const maxCapacity = {{ item.max_capacity|default:'null' }};
+
+        function refreshItemAdjust() {
+            if (adjustType.value === 'OUT') {
+                adjustQty.max = currentQty;
+                adjustHint.textContent = `Stock Out can remove up to ${currentQty} unit${currentQty === 1 ? '' : 's'}.`;
+            } else {
+                if (maxCapacity !== null) {
+                    const allowed = Math.max(0, maxCapacity - currentQty);
+                    adjustQty.max = allowed;
+                    adjustHint.textContent = allowed > 0
+                        ? `Stock In can add up to ${allowed} unit${allowed === 1 ? '' : 's'} to reach max capacity (${maxCapacity}).`
+                        : `This item is already at maximum capacity (${maxCapacity}).`;
+                } else {
+                    adjustQty.removeAttribute('max');
+                    adjustHint.textContent = 'Stock In has no configured max capacity; add any positive quantity.';
+                }
+            }
+
+            const currentValue = Number(adjustQty.value || 1);
+            if (adjustQty.max && currentValue > Number(adjustQty.max)) {
+                adjustQty.value = adjustQty.max || 1;
+            }
+        }
+
+        if (adjustType && adjustQty && adjustHint) {
+            adjustType.addEventListener('change', refreshItemAdjust);
+            document.addEventListener('DOMContentLoaded', refreshItemAdjust);
+            refreshItemAdjust();
+        }
+    })();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
     new QRCode(document.getElementById("itemQR"), {

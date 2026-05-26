@@ -1,0 +1,241 @@
+{% extends 'base.html' %}
+
+{% block title %}AI Restock Alerts | SNSU DRRM{% endblock %}
+
+{% block extra_head %}
+<style>
+    .alert-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 1rem;
+    }
+    .alert-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 1rem;
+        background: white;
+        dark: background: #111827;
+    }
+    .alert-card.critical {
+        border-left: 4px solid #dc2626;
+        background: #fef2f2;
+    }
+    .alert-card.high {
+        border-left: 4px solid #f97316;
+        background: #fffbeb;
+    }
+    .alert-card.medium {
+        border-left: 4px solid #eab308;
+        background: #fffbeb;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">AI Restock Alerts</h1>
+        <p class="text-gray-600 mt-2">AI-generated recommendations for inventory management</p>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-red-50 border-l-4 border-red-600 p-4 rounded">
+            <div class="text-2xl font-bold text-red-600">{{ critical_count }}</div>
+            <div class="text-sm text-red-700">Critical Alerts</div>
+        </div>
+        <div class="bg-orange-50 border-l-4 border-orange-600 p-4 rounded">
+            <div class="text-2xl font-bold text-orange-600">{{ high_count }}</div>
+            <div class="text-sm text-orange-700">High Priority</div>
+        </div>
+        <div class="bg-yellow-50 border-l-4 border-yellow-600 p-4 rounded">
+            <div class="text-2xl font-bold text-yellow-600">{{ medium_count }}</div>
+            <div class="text-sm text-yellow-700">Medium Priority</div>
+        </div>
+        <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
+            <div class="text-2xl font-bold text-blue-600">{{ alerts|length }}</div>
+            <div class="text-sm text-blue-700">Total Alerts</div>
+        </div>
+    </div>
+
+    <!-- Alerts Display -->
+    <div class="bg-white rounded-lg shadow p-6">
+        {% if alerts %}
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left py-2">Item</th>
+                        <th class="text-left py-2">Severity</th>
+                        <th class="text-left py-2">Current</th>
+                        <th class="text-left py-2">Predicted</th>
+                        <th class="text-left py-2">Recommended</th>
+                        <th class="text-left py-2">Stockout</th>
+                        <th class="text-left py-2">Status</th>
+                        <th class="text-left py-2">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in alerts %}
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="py-3">
+                            <div class="font-bold">{{ alert.item.name }}</div>
+                            <div class="text-sm text-gray-500">{{ alert.item.item_code }}</div>
+                        </td>
+                        <td class="py-3">
+                            <span class="px-2 py-1 rounded text-sm font-bold
+                                {% if alert.severity == 'CRITICAL' %}bg-red-100 text-red-700{% endif %}
+                                {% if alert.severity == 'HIGH' %}bg-orange-100 text-orange-700{% endif %}
+                                {% if alert.severity == 'MEDIUM' %}bg-yellow-100 text-yellow-700{% endif %}
+                                {% if alert.severity == 'LOW' %}bg-blue-100 text-blue-700{% endif %}
+                            ">
+                                {{ alert.get_severity_display }}
+                            </span>
+                        </td>
+                        <td class="py-3 font-bold">{{ alert.current_quantity }}</td>
+                        <td class="py-3 font-bold">{{ alert.predicted_quantity }}</td>
+                        <td class="py-3 font-bold text-green-600">{{ alert.recommended_restock }}</td>
+                        <td class="py-3">
+                            {% if alert.predicted_stockout_date %}
+                                <span class="font-bold text-red-600">{{ alert.predicted_stockout_date }}</span>
+                            {% else %}
+                                <span class="text-gray-500">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3">
+                            <span class="px-2 py-1 rounded text-sm
+                                {% if alert.status == 'ACTIVE' %}bg-red-100 text-red-700{% endif %}
+                                {% if alert.status == 'ACKNOWLEDGED' %}bg-blue-100 text-blue-700{% endif %}
+                                {% if alert.status == 'RESTOCKED' %}bg-green-100 text-green-700{% endif %}
+                                {% if alert.status == 'RESOLVED' %}bg-gray-100 text-gray-700{% endif %}
+                            ">
+                                {{ alert.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="py-3 space-x-2">
+                            {% if alert.status == 'ACTIVE' %}
+                                <button onclick="acknowledgeAlert({{ alert.id }})" class="px-2 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">ACK</button>
+                                <button onclick="markRestocked({{ alert.id }})" class="px-2 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600">Restocked</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="text-center py-8">
+                <p class="text-gray-600">No alerts at this time. System is operating normally.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Alert Details -->
+    {% if alerts %}
+    <div class="space-y-4">
+        <h2 class="text-xl font-bold">Alert Details</h2>
+        {% for alert in alerts %}
+        <div class="bg-white rounded-lg shadow p-6 {% if alert.severity == 'CRITICAL' %}border-l-4 border-red-600{% elif alert.severity == 'HIGH' %}border-l-4 border-orange-600{% endif %}">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 class="text-lg font-bold">{{ alert.item.name }}</h3>
+                    <p class="text-gray-600">{{ alert.item.item_code }} | Category: {{ alert.item.category }}</p>
+                </div>
+                <span class="px-3 py-1 rounded font-bold text-sm
+                    {% if alert.severity == 'CRITICAL' %}bg-red-100 text-red-700{% endif %}
+                    {% if alert.severity == 'HIGH' %}bg-orange-100 text-orange-700{% endif %}
+                ">
+                    {{ alert.get_severity_display }}
+                </span>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div>
+                    <p class="text-gray-600 text-sm">Current Qty</p>
+                    <p class="text-2xl font-bold">{{ alert.current_quantity }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-600 text-sm">Predicted (7d)</p>
+                    <p class="text-2xl font-bold">{{ alert.predicted_quantity }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-600 text-sm">Recommended</p>
+                    <p class="text-2xl font-bold text-green-600">{{ alert.recommended_restock }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-600 text-sm">Avg Weekly</p>
+                    <p class="text-2xl font-bold">{{ alert.avg_weekly_consumption|floatformat:1 }}</p>
+                </div>
+            </div>
+            <div class="bg-gray-50 p-4 rounded mb-4">
+                <p class="text-sm font-bold text-gray-700 mb-2">📊 Analysis</p>
+                <p class="text-gray-700">{{ alert.reason }}</p>
+                <p class="text-sm text-gray-600 mt-2">Trend: <span class="font-bold">{{ alert.get_consumption_trend_display }}</span></p>
+            </div>
+            <div class="flex gap-2">
+                {% if alert.status == 'ACTIVE' %}
+                    <button onclick="acknowledgeAlert({{ alert.id }})" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Acknowledge Alert</button>
+                    <button onclick="markRestocked({{ alert.id }})" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">Mark as Restocked</button>
+                {% else %}
+                    <span class="px-4 py-2 bg-gray-200 text-gray-700 rounded">Alert {{ alert.get_status_display }}</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function acknowledgeAlert(alertId) {
+    fetch('/api/ai/acknowledge-alert/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ alert_id: alertId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function markRestocked(alertId) {
+    fetch('/api/ai/mark-restocked/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ alert_id: alertId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}
