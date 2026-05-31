@@ -23,4 +23,12 @@ urlpatterns = [
     path('settings/', views.settings, name='settings'),
     path('api/notifications/', views.get_notifications, name='get_notifications'),
     path('export/inventory/', views.export_inventory, name='export_inventory'),
+    
+    # AI Analytics Endpoints
+    path('ai/alerts/', views.ai_alerts, name='ai_alerts'),
+    path('api/ai/acknowledge-alert/', views.acknowledge_restock_alert, name='acknowledge_alert'),
+    path('api/ai/mark-restocked/', views.mark_restocked, name='mark_restocked'),
+    path('ai/consumption-analytics/', views.consumption_analytics_view, name='consumption_analytics'),
+    path('ai/logistics-analytics/', views.logistics_analytics_view, name='logistics_analytics'),
+    path('ai/supply-cycle/', views.supply_cycle_view, name='supply_cycle'),
 ]

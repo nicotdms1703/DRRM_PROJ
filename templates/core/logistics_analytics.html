@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+
+{% block title %}Logistics Analytics | SNSU DRRM{% endblock %}
+
+{% block extra_head %}
+<style>
+    .metric-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+    .metric-value {
+        font-size: 2.25rem;
+        font-weight: bold;
+        color: #1f2937;
+    }
+    .metric-label {
+        color: #6b7280;
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">📦 Logistics Analytics</h1>
+        <p class="text-gray-600 mt-2">Deployment, Return Rates & Efficiency Metrics</p>
+    </div>
+
+    <!-- Summary Metrics -->
+    {% if latest_analytics %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="metric-card">
+            <div class="metric-value">{{ latest_analytics.total_units_deployed }}</div>
+            <div class="metric-label">Total Units Deployed</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ latest_analytics.total_borrowing_events }}</div>
+            <div class="metric-label">Borrowing Events</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ latest_analytics.return_rate_percentage|floatformat:1 }}%</div>
+            <div class="metric-label">Return Rate</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ latest_analytics.logistics_efficiency_score|floatformat:0 }}/100</div>
+            <div class="metric-label">Efficiency Score</div>
+        </div>
+    </div>
+
+    <!-- Detailed Analytics -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Deployment Details -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-bold mb-4">🚀 Deployment Details</h2>
+            <div class="space-y-3">
+                <div class="flex justify-between border-b pb-2">
+                    <span class="text-gray-700">Total Units Deployed</span>
+                    <span class="font-bold">{{ latest_analytics.total_units_deployed }}</span>
+                </div>
+                <div class="flex justify-between border-b pb-2">
+                    <span class="text-gray-700">Currently Active Deployments</span>
+                    <span class="font-bold">{{ latest_analytics.active_deployments }}</span>
+                </div>
+                <div class="flex justify-between border-b pb-2">
+                    <span class="text-gray-700">Average Deployment Duration</span>
+                    <span class="font-bold">{{ latest_analytics.avg_deployment_duration_days|floatformat:1 }} days</span>
+                </div>
+                <div class="flex justify-between border-b pb-2">
+                    <span class="text-gray-700">Most Borrowed Item</span>
+                    <span class="font-bold">{% if latest_analytics.most_borrowed_item %}{{ latest_analytics.most_borrowed_item.name }}{% else %}N/A{% endif %}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-700">Most Borrowed Category</span>
+                    <span class="font-bold">{{ latest_analytics.most_borrowed_category }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Return Analysis -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-xl font-bold mb-4">📊 Return Analysis</h2>
+            <div class="space-y-3">
+                <div class="flex justify-between border-b pb-2">
+                    <span class="text-gray-700">On-Time Returns</span>
+                    <span class="font-bold text-green-600">{{ latest_analytics.on_time_returns }}</span>
+                </div>
+                <div class="flex justify-between border-b pb-2">
+                    <span class="text-gray-700">Delayed Returns</span>
+                    <span class="font-bold text-red-600">{{ latest_analytics.delayed_returns }}</span>
+                </div>
+                <div class="flex justify-between border-b pb-2">
+                    <span class="text-gray-700">Return Rate</span>
+                    <span class="font-bold">{{ latest_analytics.return_rate_percentage|floatformat:1 }}%</span>
+                </div>
+                <div class="flex justify-between border-b pb-2">
+                    <span class="text-gray-700">Efficiency Score</span>
+                    <span class="font-bold text-blue-600">{{ latest_analytics.logistics_efficiency_score|floatformat:0 }}/100</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-700">Trend</span>
+                    <span class="font-bold {% if latest_analytics.trend == 'INCREASING' %}text-red-600{% elif latest_analytics.trend == 'DECREASING' %}text-red-600{% else %}text-green-600{% endif %}">
+                        {% if latest_analytics.trend == 'INCREASING' %}📈 Increasing{% elif latest_analytics.trend == 'DECREASING' %}📉 Decreasing{% else %}➡️ Stable{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Deployment Breakdown -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-bold mb-4">📦 Category-wise Deployment</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="bg-blue-50 p-4 rounded text-center">
+                <p class="text-gray-600 text-sm">Equipment</p>
+                <p class="text-2xl font-bold text-blue-600">{{ latest_analytics.equipment_deployed }}</p>
+            </div>
+            <div class="bg-green-50 p-4 rounded text-center">
+                <p class="text-gray-600 text-sm">Consumable</p>
+                <p class="text-2xl font-bold text-green-600">{{ latest_analytics.consumable_deployed }}</p>
+            </div>
+            <div class="bg-red-50 p-4 rounded text-center">
+                <p class="text-gray-600 text-sm">Medical</p>
+                <p class="text-2xl font-bold text-red-600">{{ latest_analytics.medical_deployed }}</p>
+            </div>
+            <div class="bg-yellow-50 p-4 rounded text-center">
+                <p class="text-gray-600 text-sm">Safety</p>
+                <p class="text-2xl font-bold text-yellow-600">{{ latest_analytics.safety_deployed }}</p>
+            </div>
+            <div class="bg-purple-50 p-4 rounded text-center">
+                <p class="text-gray-600 text-sm">Tools</p>
+                <p class="text-2xl font-bold text-purple-600">{{ latest_analytics.tools_deployed }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historical Data Table -->
+    {% if all_analytics %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-bold mb-4">📈 Historical Data</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b bg-gray-50">
+                        <th class="text-left py-3 px-4">Month</th>
+                        <th class="text-left py-3 px-4">Deployments</th>
+                        <th class="text-left py-3 px-4">Units</th>
+                        <th class="text-left py-3 px-4">Avg Duration</th>
+                        <th class="text-left py-3 px-4">Return Rate</th>
+                        <th class="text-left py-3 px-4">Efficiency</th>
+                        <th class="text-left py-3 px-4">Trend</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in all_analytics|slice:":12" %}
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="py-3 px-4">{{ record.month_year|date:"M Y" }}</td>
+                        <td class="py-3 px-4">{{ record.total_borrowing_events }}</td>
+                        <td class="py-3 px-4 font-bold">{{ record.total_units_deployed }}</td>
+                        <td class="py-3 px-4">{{ record.avg_deployment_duration_days|floatformat:1 }} days</td>
+                        <td class="py-3 px-4">{{ record.return_rate_percentage|floatformat:1 }}%</td>
+                        <td class="py-3 px-4">
+                            <span class="font-bold">{{ record.logistics_efficiency_score|floatformat:0 }}/100</span>
+                        </td>
+                        <td class="py-3 px-4">
+                            {% if record.trend == 'INCREASING' %}📈{% elif record.trend == 'DECREASING' %}📉{% else %}➡️{% endif %}
+                            {{ record.get_trend_display }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

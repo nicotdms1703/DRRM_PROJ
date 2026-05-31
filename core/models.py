@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 class Item(models.Model):
     CATEGORY_CHOICES = [
@@ -23,6 +24,11 @@ class Item(models.Model):
     description = models.TextField(blank=True)
     quantity = models.IntegerField(default=0)
     low_stock_threshold = models.IntegerField(default=5)
+    max_capacity = models.IntegerField(null=True, blank=True, help_text="Maximum inventory capacity for this item")
+    # Lifecycle / integrity fields
+    lifespan_days = models.IntegerField(null=True, blank=True, help_text="Approx lifespan in days (optional)")
+    integrity_score = models.FloatField(default=100.0, help_text="0-100 integrity score; lower means more worn")
+    last_inspection = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Available')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -49,10 +55,46 @@ class Item(models.Model):
             self.status = 'Low Stock'
         else:
             self.status = 'Available'
+
+        # Integrity-based maintenance status
+        try:
+            if self.integrity_score is not None and self.integrity_score <= 30:
+                self.status = 'Maintenance'
+        except Exception:
+            pass
+
         super().save(*args, **kwargs)
+
+        # Check lifespan after initial save (created_at is available)
+        try:
+            if self.lifespan_days and self.created_at:
+                age_days = (timezone.now().date() - self.created_at.date()).days
+                if age_days >= self.lifespan_days:
+                    # mark for maintenance if lifespan exceeded
+                    if self.status != 'Maintenance':
+                        self.status = 'Maintenance'
+                        super().save(update_fields=['status', 'updated_at'])
+        except Exception:
+            pass
 
     def __str__(self):
         return f"{self.name} ({self.item_code})"
+
+    @property
+    def available_out_quantity(self):
+        return max(0, self.quantity)
+
+    @property
+    def available_in_quantity(self):
+        if self.max_capacity is None:
+            return None
+        return max(0, self.max_capacity - self.quantity)
+
+    @property
+    def stock_capacity_status(self):
+        if self.max_capacity is None:
+            return 'No capacity limit set.'
+        return f"{self.quantity} / {self.max_capacity} currently stocked."
 
 class StockTransaction(models.Model):
     TRANSACTION_TYPE = [
@@ -80,6 +122,11 @@ class Borrowing(models.Model):
     date_borrowed = models.DateTimeField(auto_now_add=True)
     return_date = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
+
+    # Condition tracking for borrowed items
+    wear_score = models.FloatField(null=True, blank=True, help_text='0-100 wear/damage score reported on return')
+    condition_on_return = models.TextField(blank=True, help_text='Free-text condition notes on return')
+    inspected = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.borrower_name} borrowed {self.item.name}"
@@ -119,3 +166,220 @@ class TaskItem(models.Model):
 
     def __str__(self):
         return f"{self.quantity}x {self.item.name} for {self.task.title}"
+
+
+# AI-POWERED ANALYTICS & CONSUMPTION TRACKING MODELS
+class ConsumptionAnalytics(models.Model):
+    """Weekly consumption tracking for AI-driven inventory management."""
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='consumption_analytics')
+    week_start = models.DateField()  # Monday of the week
+    week_end = models.DateField()
+    consumable_consumed = models.IntegerField(default=0)  # Units consumed from stock transactions
+    borrowed_quantity = models.IntegerField(default=0)  # Units borrowed
+    total_movement = models.IntegerField(default=0)  # Total units in/out
+    avg_daily_consumption = models.FloatField(default=0.0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('item', 'week_start')
+        ordering = ['-week_start']
+
+    def __str__(self):
+        return f"{self.item.name} - Week of {self.week_start}"
+
+
+class RestockAlert(models.Model):
+    """AI-Generated restock alerts based on consumption patterns."""
+    SEVERITY_CHOICES = [
+        ('CRITICAL', 'Critical - Out of Stock Risk'),
+        ('HIGH', 'High - Low Stock Warning'),
+        ('MEDIUM', 'Medium - Preventive Restock'),
+        ('LOW', 'Low - Routine Check'),
+    ]
+    STATUS_CHOICES = [
+        ('ACTIVE', 'Active'),
+        ('ACKNOWLEDGED', 'Acknowledged'),
+        ('RESTOCKED', 'Restocked'),
+        ('RESOLVED', 'Resolved'),
+    ]
+
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='restock_alerts')
+    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES)
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='ACTIVE')
+    
+    # AI Analysis
+    current_quantity = models.IntegerField()
+    predicted_quantity = models.IntegerField()  # Predicted quantity after 7 days
+    recommended_restock = models.IntegerField()  # AI recommendation
+    predicted_stockout_date = models.DateField(null=True, blank=True)  # When it will run out
+    
+    # Reasoning
+    avg_weekly_consumption = models.FloatField()
+    consumption_trend = models.CharField(max_length=20, choices=[
+        ('STABLE', 'Stable'),
+        ('INCREASING', 'Increasing'),
+        ('DECREASING', 'Decreasing'),
+    ])
+    reason = models.TextField()  # Why this alert was generated
+    
+    alert_generated_at = models.DateTimeField(auto_now_add=True)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    acknowledged_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='acknowledged_alerts')
+
+    class Meta:
+        ordering = ['-alert_generated_at']
+
+    def __str__(self):
+        return f"{self.get_severity_display()} - {self.item.name}"
+
+
+class MaintenanceAlert(models.Model):
+    """AI-Generated maintenance alerts based on integrity and lifespan."""
+    SEVERITY_CHOICES = [
+        ('CRITICAL', 'Critical - Replace Now'),
+        ('HIGH', 'High - Replace Soon'),
+        ('MEDIUM', 'Medium - Schedule Maintenance'),
+        ('LOW', 'Low - Monitor'),
+    ]
+    STATUS_CHOICES = [
+        ('ACTIVE', 'Active'),
+        ('ACKNOWLEDGED', 'Acknowledged'),
+        ('MAINTAINED', 'Maintained'),
+        ('REPLACED', 'Replaced'),
+        ('RESOLVED', 'Resolved'),
+    ]
+
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='maintenance_alerts')
+    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES)
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='ACTIVE')
+
+    current_integrity = models.FloatField(null=True, blank=True)
+    predicted_end_of_life = models.DateField(null=True, blank=True)
+    recommended_action = models.CharField(max_length=200, blank=True)
+    reason = models.TextField(blank=True)
+
+    alert_generated_at = models.DateTimeField(auto_now_add=True)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    acknowledged_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='acknowledged_maintenance_alerts')
+
+    class Meta:
+        ordering = ['-alert_generated_at']
+
+    def __str__(self):
+        return f"{self.get_severity_display()} - {self.item.name}"
+
+
+class SupplyConsumptionCycle(models.Model):
+    """Monthly supply consumption cycle analysis for analytics engine."""
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='supply_cycles')
+    month_year = models.DateField()  # First day of the month
+    
+    # Consumption Metrics
+    total_consumed = models.IntegerField(default=0)
+    total_borrowed = models.IntegerField(default=0)
+    total_restocked = models.IntegerField(default=0)
+    restock_count = models.IntegerField(default=0)  # Number of restock events
+    
+    # Trend Analysis
+    avg_daily_consumption = models.FloatField(default=0.0)
+    consumption_variance = models.FloatField(default=0.0)  # Standard deviation
+    peak_consumption_day = models.IntegerField(null=True, blank=True)  # Day of month with highest consumption
+    
+    # Category Analysis
+    category = models.CharField(max_length=20)
+    deployment_status = models.CharField(max_length=50, choices=[
+        ('STABLE', 'Stable Supply'),
+        ('CRITICAL', 'Critical Consumption'),
+        ('BUILDING', 'Building Reserves'),
+        ('TRANSITIONING', 'Transitioning'),
+    ], default='STABLE')
+    
+    # Forecasting
+    predicted_consumption_next_month = models.FloatField(default=0.0)
+    min_restock_recommended = models.IntegerField(default=0)
+    optimal_restock_quantity = models.IntegerField(default=0)
+    
+    generated_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('item', 'month_year')
+        ordering = ['-month_year']
+
+    def __str__(self):
+        return f"{self.item.name} - {self.month_year.strftime('%B %Y')}"
+
+
+class LogisticsAnalytics(models.Model):
+    """Logistics and deployment analytics with monthly updates."""
+    month_year = models.DateField()  # First day of the month
+    
+    # Borrowing/Deployment Analytics
+    total_borrowing_events = models.IntegerField(default=0)
+    total_units_deployed = models.IntegerField(default=0)
+    avg_deployment_duration_days = models.FloatField(default=0.0)
+    active_deployments = models.IntegerField(default=0)
+    
+    # Return Rate Analytics
+    on_time_returns = models.IntegerField(default=0)
+    delayed_returns = models.IntegerField(default=0)
+    return_rate_percentage = models.FloatField(default=0.0)
+    
+    # Category-wise Deployment
+    equipment_deployed = models.IntegerField(default=0)
+    consumable_deployed = models.IntegerField(default=0)
+    medical_deployed = models.IntegerField(default=0)
+    safety_deployed = models.IntegerField(default=0)
+    tools_deployed = models.IntegerField(default=0)
+    
+    # Performance Metrics
+    most_borrowed_item = models.ForeignKey(Item, on_delete=models.SET_NULL, null=True, blank=True, related_name='logistics_records')
+    most_borrowed_category = models.CharField(max_length=20)
+    logistics_efficiency_score = models.FloatField(default=0.0)  # 0-100
+    
+    # Trend
+    trend = models.CharField(max_length=20, choices=[
+        ('INCREASING', 'Increasing Deployment'),
+        ('STABLE', 'Stable Operations'),
+        ('DECREASING', 'Decreasing Deployment'),
+    ], default='STABLE')
+    
+    generated_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-month_year']
+
+    def __str__(self):
+        return f"Logistics Analytics - {self.month_year.strftime('%B %Y')}"
+
+
+class Notification(models.Model):
+    """Notification system for AI alerts and system events."""
+    NOTIFICATION_TYPE = [
+        ('RESTOCK_ALERT', 'Restock Alert'),
+        ('LOW_STOCK', 'Low Stock Warning'),
+        ('OUT_OF_STOCK', 'Out of Stock'),
+        ('OVERDUE_RETURN', 'Overdue Return'),
+        ('ANALYTICS_UPDATE', 'Analytics Update'),
+        ('SYSTEM', 'System Message'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True)
+    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPE)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, null=True, blank=True, related_name='notifications')
+    
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    action_required = models.BooleanField(default=False)
+    
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.get_notification_type_display()} - {self.title}"

@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block title %}Consumption Analytics | SNSU DRRM{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">📊 Consumption Analytics</h1>
+        <p class="text-gray-600 mt-2">Weekly and Monthly Supply Consumption Analysis</p>
+    </div>
+
+    <!-- Weekly Analytics -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-2xl font-bold mb-4">📅 Weekly Analysis ({{ week_start }})</h2>
+        {% if week_analytics %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b bg-gray-50">
+                        <th class="text-left py-3 px-4">Item Name</th>
+                        <th class="text-left py-3 px-4">Category</th>
+                        <th class="text-left py-3 px-4">Consumed</th>
+                        <th class="text-left py-3 px-4">Borrowed</th>
+                        <th class="text-left py-3 px-4">Total Movement</th>
+                        <th class="text-left py-3 px-4">Avg Daily</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in week_analytics %}
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="py-3 px-4 font-bold">{{ record.item.name }}</td>
+                        <td class="py-3 px-4">{{ record.item.category }}</td>
+                        <td class="py-3 px-4">{{ record.consumable_consumed }} units</td>
+                        <td class="py-3 px-4">{{ record.borrowed_quantity }} units</td>
+                        <td class="py-3 px-4 font-bold">{{ record.total_movement }} units</td>
+                        <td class="py-3 px-4">{{ record.avg_daily_consumption|floatformat:1 }} units</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-600">No consumption data available for this week yet.</p>
+        {% endif %}
+    </div>
+
+    <!-- Monthly Analytics -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-2xl font-bold mb-4">📊 Monthly Supply Cycles ({{ month_start|date:"F Y" }})</h2>
+        {% if monthly_analytics %}
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b bg-gray-50">
+                        <th class="text-left py-3 px-4">Item</th>
+                        <th class="text-left py-3 px-4">Category</th>
+                        <th class="text-left py-3 px-4">Consumed</th>
+                        <th class="text-left py-3 px-4">Avg Daily</th>
+                        <th class="text-left py-3 px-4">Deployment Status</th>
+                        <th class="text-left py-3 px-4">Recommended Restock</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cycle in monthly_analytics %}
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="py-3 px-4 font-bold">{{ cycle.item.name }}</td>
+                        <td class="py-3 px-4">{{ cycle.category }}</td>
+                        <td class="py-3 px-4">{{ cycle.total_consumed }} units</td>
+                        <td class="py-3 px-4">{{ cycle.avg_daily_consumption|floatformat:2 }} units</td>
+                        <td class="py-3 px-4">
+                            <span class="px-2 py-1 rounded text-sm font-bold
+                                {% if cycle.deployment_status == 'CRITICAL' %}bg-red-100 text-red-700{% endif %}
+                                {% if cycle.deployment_status == 'STABLE' %}bg-green-100 text-green-700{% endif %}
+                                {% if cycle.deployment_status == 'BUILDING' %}bg-blue-100 text-blue-700{% endif %}
+                                {% if cycle.deployment_status == 'TRANSITIONING' %}bg-yellow-100 text-yellow-700{% endif %}
+                            ">
+                                {{ cycle.get_deployment_status_display }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 font-bold text-green-600">{{ cycle.optimal_restock_quantity }} units</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-600">Monthly analytics will be generated on the 1st of each month.</p>
+        {% endif %}
+    </div>
+
+    <!-- Category Summary -->
+    {% if monthly_analytics %}
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-2xl font-bold mb-4">📦 By Category</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for category in monthly_analytics|dictsort:"category" %}
+            <div class="bg-gray-50 p-4 rounded border-l-4 border-blue-500">
+                <p class="text-gray-600 text-sm">{{ category.item.category }}</p>
+                <p class="text-2xl font-bold">{{ category.total_consumed }} units</p>
+                <p class="text-sm text-gray-600 mt-2">Avg: {{ category.avg_daily_consumption|floatformat:1 }}/day</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
