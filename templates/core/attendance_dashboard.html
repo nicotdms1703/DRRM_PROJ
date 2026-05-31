@@ -1,0 +1,499 @@
+{% extends 'base.html' %}
+{% block title %}Responder Attendance | SNSU DRRM{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+        <div>
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Responder Duty Log
+            </h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Scan ID and track active hours of emergency responders.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="openManageModal()" class="px-5 py-2.5 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-sm font-bold uppercase tracking-widest transition-all flex items-center gap-2 shadow-md cursor-pointer border-none">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
+                <span>Manage Responders</span>
+            </button>
+            <button onclick="openRegisterModal()" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-bold uppercase tracking-widest transition-all flex items-center gap-2 shadow-md cursor-pointer border-none">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                </svg>
+                <span>Register Responder</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- QR Scanner Section -->
+        <div class="lg:col-span-4 space-y-6">
+            <div class="enterprise-card p-6 bg-white dark:bg-enterprise-darkCard border border-slate-200 dark:border-enterprise-darkBorder text-center">
+                <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-enterprise-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                    </svg>
+                    Scan Responder ID
+                </h3>
+                
+                <div class="bg-slate-50 dark:bg-slate-900 rounded-xl overflow-hidden mb-4 border border-slate-200 dark:border-slate-800">
+                    <div id="reader" style="width:100%; border:none;"></div>
+                </div>
+                
+                <div id="scan-status" class="py-3 px-4 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-medium border border-slate-200 dark:border-slate-700 transition-colors">
+                    Waiting for scan...
+                </div>
+                <p class="text-xs text-slate-400 mt-4">Please scan your DOH-HEMS License QR Code to log in or out.</p>
+            </div>
+
+            <!-- Currently On Duty -->
+            <div class="enterprise-card bg-white dark:bg-enterprise-darkCard border border-slate-200 dark:border-enterprise-darkBorder overflow-hidden">
+                <div class="p-4 border-b border-slate-100 dark:border-enterprise-darkBorder bg-slate-50 dark:bg-slate-800/50 flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <h3 class="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Currently On Duty</h3>
+                </div>
+                <div class="p-0">
+                    <ul class="divide-y divide-slate-100 dark:divide-enterprise-darkBorder" id="active-responders">
+                        {% for log in active_logs %}
+                        <li class="p-4 flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <div>
+                                <div class="text-sm font-bold text-slate-800 dark:text-white">{{ log.responder.name }}</div>
+                                <div class="text-[10px] text-slate-500 uppercase tracking-wider mt-1">In: {{ log.login_time|time:"h:i A" }}</div>
+                            </div>
+                            <span class="px-2 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold rounded-full border border-emerald-200 dark:border-emerald-800/50 uppercase tracking-wider">Active</span>
+                        </li>
+                        {% empty %}
+                        <li class="p-6 text-center text-sm text-slate-400 italic">No responders currently on duty.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaderboard / Race Chart -->
+        <div class="lg:col-span-8">
+            <div class="enterprise-card p-6 bg-white dark:bg-enterprise-darkCard border border-slate-200 dark:border-enterprise-darkBorder h-full flex flex-col">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-enterprise-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        Monthly Active Leaderboard
+                    </h3>
+                    <span class="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-bold uppercase tracking-widest rounded-lg border border-slate-200 dark:border-slate-700">Most Hours</span>
+                </div>
+                <div class="flex-grow min-h-[300px] w-full">
+                    <canvas id="leaderboardChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance History Log -->
+    <div class="enterprise-card p-6 bg-white dark:bg-enterprise-darkCard border border-slate-200 dark:border-enterprise-darkBorder mt-8">
+        <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-enterprise-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Duty Log Attendance History
+        </h3>
+        <div class="overflow-x-auto border border-slate-150 dark:border-enterprise-darkBorder rounded-lg">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 dark:bg-slate-800 border-b border-slate-150 dark:border-enterprise-darkBorder">
+                        <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Responder Name</th>
+                        <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Registration No.</th>
+                        <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                        <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Time In</th>
+                        <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Time Out</th>
+                        <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Duration</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-enterprise-darkBorder">
+                    {% for log in attendance_history %}
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                        <td class="px-4 py-3 text-sm font-bold text-slate-800 dark:text-white">{{ log.responder.name }}</td>
+                        <td class="px-4 py-3 text-xs font-mono text-slate-500 dark:text-slate-400">{{ log.responder.registration_no }}</td>
+                        <td class="px-4 py-3 text-sm text-slate-600 dark:text-slate-400">{{ log.login_time|date:"F d, Y" }}</td>
+                        <td class="px-4 py-3 text-sm text-emerald-600 dark:text-emerald-400 font-medium">{{ log.login_time|time:"h:i A" }}</td>
+                        <td class="px-4 py-3 text-sm text-rose-600 dark:text-rose-400 font-medium">
+                            {% if log.logout_time %}
+                            {{ log.logout_time|time:"h:i A" }}
+                            {% else %}
+                            <span class="italic text-slate-400">On Duty</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300 font-bold">
+                            {% if log.logout_time %}
+                            {{ log.formatted_duration }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-sm text-slate-400 italic">No attendance records found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // --- QR Scanner Logic ---
+        let html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
+
+        function onScanSuccess(decodedText, decodedResult) {
+            html5QrcodeScanner.pause();
+            let statusEl = document.getElementById('scan-status');
+            
+            // Tailwind status update
+            statusEl.className = "py-3 px-4 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-sm font-medium border border-amber-200 dark:border-amber-800/50 flex items-center justify-center gap-2";
+            statusEl.innerHTML = `<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...`;
+
+            fetch('/api/attendance/scan/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ qr_payload: decodedText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    if(data.action === 'login') {
+                        statusEl.className = "py-3 px-4 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-sm font-medium border border-emerald-200 dark:border-emerald-800/50";
+                        statusEl.innerHTML = `Welcome on duty, <b>${data.name}</b>!`;
+                    } else {
+                        statusEl.className = "py-3 px-4 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-medium border border-blue-200 dark:border-blue-800/50";
+                        let hrs = (data.duration / 3600).toFixed(2);
+                        statusEl.innerHTML = `<b>${data.name}</b> logged out. Duration: ${hrs} hrs.`;
+                    }
+                    setTimeout(() => { location.reload(); }, 2000); // Reload to update dashboard
+                } else {
+                    statusEl.className = "py-3 px-4 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm font-medium border border-red-200 dark:border-red-800/50";
+                    statusEl.innerHTML = `Error: ${data.message}`;
+                    setTimeout(() => { 
+                        html5QrcodeScanner.resume(); 
+                        statusEl.className = "py-3 px-4 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-medium border border-slate-200 dark:border-slate-700"; 
+                        statusEl.innerText = "Waiting for scan..."; 
+                    }, 3000);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                statusEl.className = "py-3 px-4 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm font-medium border border-red-200 dark:border-red-800/50";
+                statusEl.innerHTML = "System error during scan.";
+                setTimeout(() => { html5QrcodeScanner.resume(); }, 3000);
+            });
+        }
+
+        html5QrcodeScanner.render(onScanSuccess);
+
+        // --- Leaderboard Bar Race Chart Logic ---
+        const leaderboardData = JSON.parse('{{ leaderboard_json|escapejs }}' || '[]');
+        
+        const labels = leaderboardData.map(d => d.name);
+        const dataVals = leaderboardData.map(d => d.total_hours);
+        
+        const isDark = document.documentElement.classList.contains('dark');
+        const textColor = isDark ? '#9CA3AF' : '#6B7280';
+        const gridColor = isDark ? '#374151' : '#E5E7EB';
+        
+        const ctx = document.getElementById('leaderboardChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Total Hours on Duty',
+                    data: dataVals,
+                    backgroundColor: '#2D6A4F',
+                    borderColor: '#1B4332',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y', // Makes it a horizontal bar chart (looks like a race)
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 2000,
+                    easing: 'easeOutQuart'
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: { color: gridColor },
+                        ticks: { color: textColor },
+                        title: {
+                            display: true,
+                            text: 'Hours',
+                            color: textColor,
+                            font: { size: 10, weight: 'bold' }
+                        }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { color: textColor, font: { weight: 'bold' } }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    });
+</script>
+
+<!-- Register Responder Modal -->
+<div id="registerModal" class="fixed inset-0 z-50 overflow-y-auto hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-enterprise-darkCard border border-slate-200 dark:border-enterprise-darkBorder rounded-xl max-w-md w-full shadow-2xl overflow-hidden transform transition-all">
+        <div class="px-6 py-4 border-b border-slate-100 dark:border-enterprise-darkBorder bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+            <h3 class="text-sm font-black text-slate-700 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                </svg>
+                Register New Responder
+            </h3>
+            <button onclick="closeRegisterModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer bg-transparent border-none">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <form id="registerForm" onsubmit="submitRegistration(event)" class="p-6 space-y-4 m-0 text-left">
+            <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Full Name</label>
+                <input type="text" id="reg_name" required placeholder="e.g. Nico" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500 transition-colors">
+            </div>
+            <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Registration No. / License ID</label>
+                <input type="text" id="reg_no" required placeholder="e.g. BLSHP-24-DOHCaraga-5407" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500 transition-colors">
+            </div>
+            <div>
+                <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">QR Code Data (License QR)</label>
+                <div class="flex gap-2">
+                    <input type="text" id="reg_qr_payload" placeholder="Scan your QR or auto-fills" class="flex-grow px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-800 dark:text-white outline-none focus:border-amber-500 transition-colors">
+                    <button type="button" onclick="startRegScanner()" class="px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer">
+                        📷 Scan QR
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Hidden scanner container inside modal -->
+            <div id="reg-scanner-container" class="hidden border border-slate-200 dark:border-slate-700 rounded-lg p-2 bg-slate-50 dark:bg-slate-900">
+                <div id="reg-reader" style="width:100%;"></div>
+                <div class="text-center mt-2">
+                    <button type="button" onclick="stopRegScanner()" class="px-2 py-1 bg-red-100 text-red-600 rounded text-xs font-bold hover:bg-red-200 border-none cursor-pointer">Cancel Scan</button>
+                </div>
+            </div>
+
+            <div id="reg-status" class="hidden text-xs p-2 rounded"></div>
+
+            <div class="flex justify-end pt-2 gap-2">
+                <button type="button" onclick="closeRegisterModal()" class="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all cursor-pointer bg-transparent">Cancel</button>
+                <button type="submit" class="px-5 py-2 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700 shadow-sm transition-all cursor-pointer border-none">Register</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Manage Responders Modal -->
+<div id="manageModal" class="fixed inset-0 z-50 overflow-y-auto hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-enterprise-darkCard border border-slate-200 dark:border-enterprise-darkBorder rounded-xl max-w-2xl w-full shadow-2xl overflow-hidden transform transition-all text-left">
+        <div class="px-6 py-4 border-b border-slate-100 dark:border-enterprise-darkBorder bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
+            <h3 class="text-sm font-black text-slate-700 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
+                Registered Responders List
+            </h3>
+            <button onclick="closeManageModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer bg-transparent border-none">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="p-6">
+            <div class="max-h-[300px] overflow-y-auto border border-slate-150 dark:border-enterprise-darkBorder rounded-lg">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 dark:bg-slate-800 border-b border-slate-150 dark:border-enterprise-darkBorder">
+                            <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Name</th>
+                            <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Registration No.</th>
+                            <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-enterprise-darkBorder">
+                        {% for r in responders %}
+                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                            <td class="px-4 py-3 text-sm font-bold text-slate-800 dark:text-white">{{ r.name }}</td>
+                            <td class="px-4 py-3 text-xs font-mono text-slate-500 dark:text-slate-400">{{ r.registration_no }}</td>
+                            <td class="px-4 py-3 text-center">
+                                <button onclick="deleteResponder({{ r.id }}, '{{ r.name|escapejs }}')" class="px-3 py-1.5 bg-red-100 hover:bg-red-200 dark:bg-red-950/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold transition-all border-none cursor-pointer flex items-center gap-1 mx-auto">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="px-4 py-8 text-center text-sm text-slate-400 italic">No responders registered in the system yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-100 dark:border-enterprise-darkBorder flex justify-end">
+            <button onclick="closeManageModal()" class="px-5 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-300 dark:hover:bg-slate-700 transition-all border-none cursor-pointer">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let regScanner = null;
+
+    window.openManageModal = function() {
+        document.getElementById('manageModal').classList.remove('hidden');
+    }
+
+    window.closeManageModal = function() {
+        document.getElementById('manageModal').classList.add('hidden');
+    }
+
+    window.deleteResponder = function(id, name) {
+        if (confirm(`Are you sure you want to delete responder "${name}"? This will permanently delete their registration and all associated duty attendance logs.`)) {
+            fetch(`/api/responder/${id}/delete/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('System error during deletion.');
+            });
+        }
+    }
+
+    window.openRegisterModal = function() {
+        document.getElementById('registerModal').classList.remove('hidden');
+    }
+
+    window.closeRegisterModal = function() {
+        document.getElementById('registerModal').classList.add('hidden');
+        stopRegScanner();
+        document.getElementById('registerForm').reset();
+        let statusEl = document.getElementById('reg-status');
+        statusEl.className = "hidden";
+        statusEl.innerHTML = "";
+    }
+
+    window.startRegScanner = function() {
+        document.getElementById('reg-scanner-container').classList.remove('hidden');
+        if (!regScanner) {
+            regScanner = new Html5Qrcode("reg-reader");
+        }
+        regScanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 200, height: 200 } },
+            (decodedText) => {
+                document.getElementById('reg_qr_payload').value = decodedText;
+                stopRegScanner();
+                let statusEl = document.getElementById('reg-status');
+                statusEl.className = "block p-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded";
+                statusEl.innerText = "QR Code successfully scanned!";
+            },
+            (errorMessage) => {
+                // Ignore scanning errors
+            }
+        ).catch(err => {
+            console.error("Reg scanner error: ", err);
+        });
+    }
+
+    window.stopRegScanner = function() {
+        if (regScanner && regScanner.isScanning) {
+            regScanner.stop().then(() => {
+                document.getElementById('reg-scanner-container').classList.add('hidden');
+            }).catch(err => console.error(err));
+        } else {
+            document.getElementById('reg-scanner-container').classList.add('hidden');
+        }
+    }
+
+    window.submitRegistration = function(e) {
+        e.preventDefault();
+        const name = document.getElementById('reg_name').value.trim();
+        const registration_no = document.getElementById('reg_no').value.trim();
+        const qr_payload = document.getElementById('reg_qr_payload').value.trim();
+        const statusEl = document.getElementById('reg-status');
+
+        statusEl.className = "block p-2 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 text-xs font-bold rounded";
+        statusEl.innerText = "Registering responder...";
+
+        fetch('/api/responder/register/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ name, registration_no, qr_payload })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                statusEl.className = "block p-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded";
+                statusEl.innerText = data.message;
+                setTimeout(() => {
+                    closeRegisterModal();
+                    location.reload();
+                }, 1500);
+            } else {
+                statusEl.className = "block p-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-bold rounded";
+                statusEl.innerText = data.message;
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            statusEl.className = "block p-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-xs font-bold rounded";
+            statusEl.innerText = "System error during registration.";
+        });
+    }
+</script>
+
+<style>
+    /* Clean up the HTML5 QR Code scanner UI */
+    #reader { border: none !important; }
+    #reader button, #reg-reader button { background: #2D6A4F; color: white; padding: 6px 12px; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; margin-top: 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+    #reader a, #reg-reader a { color: #2D6A4F; text-decoration: none; }
+    #reader span, #reg-reader span { font-family: 'Inter', sans-serif !important; }
+</style>
+{% endblock %}

@@ -3,7 +3,7 @@ from django.http import JsonResponse, HttpResponse
 from .models import (
     Item, StockTransaction, Borrowing, ActivityLog, Task, TaskItem,
     RestockAlert, ConsumptionAnalytics, SupplyConsumptionCycle,
-    LogisticsAnalytics, Notification
+    LogisticsAnalytics, Notification, Responder, ResponderLog, Patient, PatientAssessment
 )
 from django.db.models import F, Count, Q, Sum
 from django.db.models.functions import TruncDate
@@ -113,19 +113,7 @@ def dashboard(request):
     }
     return render(request, 'core/dashboard.html', context)
 
-@login_required
-def item_detail(request, pk):
-    """Structured item detail page with full action history."""
-    item = get_object_or_404(Item, id=pk)
-    transactions = StockTransaction.objects.filter(item=item).order_by('-timestamp')[:10]
-    active_borrowings = Borrowing.objects.filter(item=item, status='Pending').order_by('-date_borrowed')
-    
-    context = {
-        'item': item,
-        'transactions': transactions,
-        'active_borrowings': active_borrowings,
-    }
-    return render(request, 'core/item_detail.html', context)
+
 
 @login_required
 @user_passes_test(is_admin)
@@ -177,6 +165,50 @@ def add_item(request):
         return redirect('inventory')
     return redirect('inventory')
 
+
+@login_required
+@user_passes_test(is_staff)
+def edit_item(request, pk):
+    """View to edit an existing resource."""
+    item = get_object_or_404(Item, pk=pk)
+    error_message = None
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        category = request.POST.get('category')
+        description = request.POST.get('description', '')
+        try:
+            quantity = int(request.POST.get('quantity', item.quantity))
+            low_stock_threshold = int(request.POST.get('low_stock_threshold', item.low_stock_threshold))
+        except ValueError:
+            error_message = 'Quantity and Low Stock Threshold must be integers.'
+            quantity = item.quantity
+            low_stock_threshold = item.low_stock_threshold
+        max_capacity_value = request.POST.get('max_capacity', '').strip()
+        max_capacity = int(max_capacity_value) if max_capacity_value.isdigit() else None
+
+        if not error_message:
+            item.name = name
+            item.category = category
+            item.description = description
+            item.quantity = quantity
+            item.low_stock_threshold = low_stock_threshold
+            item.max_capacity = max_capacity
+            item.save()
+            log_activity(request.user, "Resource Updated", f"Edited {item.name} (ID {item.id})")
+            return redirect('inventory')
+    return render(request, 'core/edit_item.html', {'item': item, 'error_message': error_message})
+
+@login_required
+@user_passes_test(is_staff)
+def delete_item(request, pk):
+    """View to delete an existing resource."""
+    item = get_object_or_404(Item, pk=pk)
+    if request.method == 'POST':
+        item_name = item.name
+        item.delete()
+        log_activity(request.user, "Resource Deleted", f"Deleted {item_name} (ID {pk})")
+        return redirect('inventory')
+    return redirect('inventory')
 @login_required
 @user_passes_test(is_staff)
 def stock_management(request):
@@ -218,7 +250,7 @@ def stock_management(request):
             item.save()
 
             log_activity(request.user, f"Stock {t_type}", f"Adjusted {item.name} by {qty} units. Remarks: {remarks}")
-            return redirect('item_detail', pk=item.id)
+            return redirect('inventory')
 
     items = Item.objects.all()
     transactions = StockTransaction.objects.all().order_by('-timestamp')[:20]
@@ -233,7 +265,6 @@ def stock_management(request):
     return render(request, 'core/stock_manage.html', context)
 
 @login_required
-@user_passes_test(is_staff)
 def borrowing_system(request):
     """Handle asset borrowing and returns."""
     if request.method == 'POST':
@@ -246,16 +277,17 @@ def borrowing_system(request):
             
             item = get_object_or_404(Item, id=item_id)
             if item.quantity < qty:
-                return JsonResponse({'status': 'error', 'message': 'Insufficient items available'})
-            
-            Borrowing.objects.create(
-                item=item, borrower_name=borrower, quantity=qty
-            )
-            item.quantity -= qty
-            item.save()
-            log_activity(request.user, "Asset Borrowed", f"Authorized {qty}x {item.name} to {borrower}")
-            return redirect('item_detail', pk=item.id)
-            
+                # Set error message for insufficient stock and fall through to rendering
+                error_message = 'Insufficient items available'
+            else:
+                Borrowing.objects.create(
+                    item=item, borrower_name=borrower, quantity=qty
+                )
+                item.quantity -= qty
+                item.save()
+                log_activity(request.user, "Asset Borrowed", f"Authorized {qty}x {item.name} to {borrower}")
+                return redirect('inventory')
+        
         elif action == 'return':
             borrow_id = request.POST.get('borrow_id')
             borrow_record = get_object_or_404(Borrowing, id=borrow_id)
@@ -272,11 +304,16 @@ def borrowing_system(request):
                 
                 log_activity(request.user, "Asset Returned", f"Processed return of {borrow_record.quantity}x {item.name} from {borrow_record.borrower_name}")
             
-            return redirect('item_detail', pk=borrow_record.item.id)
-
+            return redirect('inventory')
+        
+        # Approval functionality removed per user request
+    # Prepare context for rendering borrowing page
     borrowings = Borrowing.objects.all().order_by('-date_borrowed')
     items = Item.objects.filter(quantity__gt=0).exclude(category__in=['Consumable', 'Medical'])
-    return render(request, 'core/borrowing.html', {'borrowings': borrowings, 'items': items})
+    context = {'borrowings': borrowings, 'items': items}
+    if 'error_message' in locals():
+        context['error_message'] = error_message
+    return render(request, 'core/borrowing.html', context)
 
 @login_required
 def scanner(request):
@@ -297,10 +334,6 @@ def item_detail(request, pk):
     }
     return render(request, 'core/item_detail.html', context)
 
-@login_required
-@user_passes_test(is_admin)
-def qr_generator(request):
-    """Admin feature to generate printable QR asset tags."""
     items = Item.objects.all().order_by('name')
     return render(request, 'core/qr_generate.html', {'items': items})
 
@@ -390,21 +423,9 @@ def api_item_action(request):
     return JsonResponse({'status': 'error', 'message': 'Invalid request'})
 
 @login_required
-def kanban(request):
-    """Deployment Pipeline."""
-    tasks = Task.objects.all().order_by('-created_at')
-    context = {
-        'pending': tasks.filter(status='Pending'),
-        'approved': tasks.filter(status='Approved'),
-        'in_use': tasks.filter(status='In Use'),
-        'completed': tasks.filter(status='Completed'),
-    }
-    return render(request, 'core/kanban.html', context)
-
-@login_required
 @user_passes_test(is_staff)
 def add_task(request):
-    """Custom view to create a new deployment task."""
+    """Custom view to create a new task."""
     if request.method == 'POST':
         title = request.POST.get('title')
         description = request.POST.get('description', '')
@@ -416,8 +437,8 @@ def add_task(request):
             created_by=created_by,
             status='Pending'
         )
-        log_activity(request.user, "Task Created", f"New deployment request: {title}")
-    return redirect('kanban')
+        log_activity(request.user, "Task Created", f"New task request: {title}")
+    return redirect('dashboard')
 
 @csrf_exempt
 @login_required
@@ -624,3 +645,213 @@ def supply_cycle_view(request):
         'month': current_month.strftime('%B %Y'),
     }
     return render(request, 'core/supply_cycle.html', context)
+
+
+def custom_404(request, exception=None):
+    """Custom 404 handler that automatically redirects to the dashboard."""
+    return redirect('dashboard')
+
+
+# ==========================================
+# RESPONDER ATTENDANCE SYSTEM
+# ==========================================
+
+@login_required
+def attendance_dashboard(request):
+    """View the attendance dashboard and bar race chart data."""
+    # Get all responders
+    responders = Responder.objects.all()
+    
+    # Calculate total duration per responder for the current month
+    current_month = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    leaderboard = []
+    for r in responders:
+        logs = r.logs.filter(login_time__gte=current_month)
+        total_sec = sum(log.total_duration_seconds for log in logs)
+        if total_sec > 0:
+            leaderboard.append({
+                'name': r.name,
+                'registration_no': r.registration_no,
+                'total_seconds': total_sec,
+                'total_hours': round(total_sec / 3600, 2)
+            })
+            
+    # Sort by total duration
+    leaderboard = sorted(leaderboard, key=lambda x: x['total_seconds'], reverse=True)
+    
+    # Active logs (currently on duty)
+    active_logs = ResponderLog.objects.filter(logout_time__isnull=True).order_by('-login_time')
+    
+    # All attendance history logs
+    attendance_history = ResponderLog.objects.all().order_by('-login_time')
+    
+    context = {
+        'responders': responders,
+        'leaderboard': leaderboard,
+        'leaderboard_json': json.dumps(leaderboard),
+        'active_logs': active_logs,
+        'attendance_history': attendance_history
+    }
+    return render(request, 'core/attendance_dashboard.html', context)
+
+@csrf_exempt
+@login_required
+def api_attendance_scan(request):
+    """Process QR scan for Responder Login/Logout."""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            qr_payload = data.get('qr_payload', '').strip()
+            
+            if not qr_payload:
+                return JsonResponse({'status': 'error', 'message': 'Empty QR payload.'})
+            
+            responder = Responder.objects.filter(Q(qr_payload=qr_payload) | Q(registration_no=qr_payload)).first()
+            if not responder:
+                # Optional: Auto-register if not found? User requested first to register... 
+                # Let's say if not found, we return an error indicating they need to register.
+                return JsonResponse({'status': 'error', 'message': 'Responder not found. Please register first.'})
+                
+            # Check for active log
+            active_log = ResponderLog.objects.filter(responder=responder, logout_time__isnull=True).first()
+            
+            if active_log:
+                # Log Out
+                active_log.logout_time = timezone.now()
+                duration = (active_log.logout_time - active_log.login_time).total_seconds()
+                active_log.total_duration_seconds = int(duration)
+                active_log.save()
+                return JsonResponse({'status': 'success', 'action': 'logout', 'name': responder.name, 'duration': active_log.total_duration_seconds})
+            else:
+                # Log In
+                ResponderLog.objects.create(responder=responder)
+                return JsonResponse({'status': 'success', 'action': 'login', 'name': responder.name})
+                
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)})
+    return JsonResponse({'status': 'error', 'message': 'Invalid request'})
+
+
+@csrf_exempt
+@login_required
+def api_responder_register(request):
+    """Register a new Responder in the system."""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            name = data.get('name', '').strip()
+            registration_no = data.get('registration_no', '').strip()
+            qr_payload = data.get('qr_payload', '').strip()
+
+            if not name or not registration_no:
+                return JsonResponse({'status': 'error', 'message': 'Name and Registration Number are required.'})
+
+            if Responder.objects.filter(registration_no=registration_no).exists():
+                return JsonResponse({'status': 'error', 'message': 'A responder with this Registration Number already exists.'})
+
+            if qr_payload and Responder.objects.filter(qr_payload=qr_payload).exists():
+                return JsonResponse({'status': 'error', 'message': 'This QR Code is already registered to another responder.'})
+
+            responder = Responder.objects.create(
+                name=name,
+                registration_no=registration_no,
+                qr_payload=qr_payload if qr_payload else registration_no
+            )
+
+            log_activity(request.user, 'Register Responder', f"Registered responder: {responder.name} ({responder.registration_no})")
+
+            return JsonResponse({'status': 'success', 'message': f'Responder {responder.name} successfully registered!'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)})
+    return JsonResponse({'status': 'error', 'message': 'Invalid request'})
+
+
+@csrf_exempt
+@login_required
+def api_responder_delete(request, pk):
+    """Delete a registered Responder."""
+    if request.method == 'POST':
+        try:
+            responder = get_object_or_404(Responder, id=pk)
+            name = responder.name
+            reg_no = responder.registration_no
+            responder.delete()
+            log_activity(request.user, 'Delete Responder', f"Deleted responder: {name} ({reg_no})")
+            return JsonResponse({'status': 'success', 'message': f'Responder {name} has been deleted.'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)})
+    return JsonResponse({'status': 'error', 'message': 'Invalid request'})
+
+
+# ==========================================
+# FIRST AID PATIENT ASSESSMENT MODULE
+# ==========================================
+
+@login_required
+def first_aid_dashboard(request):
+    assessments = PatientAssessment.objects.all().order_by('-date', '-time')
+    return render(request, 'core/first_aid_dashboard.html', {'assessments': assessments})
+
+@login_required
+def first_aid_form(request):
+    return render(request, 'core/first_aid_form.html')
+
+@login_required
+def first_aid_detail(request, pk):
+    assessment = get_object_or_404(PatientAssessment, id=pk)
+    return render(request, 'core/first_aid_detail.html', {'assessment': assessment})
+
+@login_required
+def first_aid_print(request, pk):
+    assessment = get_object_or_404(PatientAssessment, id=pk)
+    return render(request, 'core/first_aid_print.html', {'assessment': assessment})
+
+@csrf_exempt
+@login_required
+def api_first_aid_save(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            
+            # 1. Create Patient
+            patient = Patient.objects.create(
+                full_name=data.get('full_name'),
+                gender=data.get('gender'),
+                age=int(data.get('age', 0)),
+                cellphone_number=data.get('cellphone_number'),
+                address=data.get('address'),
+                program_year=data.get('program_year')
+            )
+            
+            # 2. Create Assessment
+            assessment = PatientAssessment.objects.create(
+                patient=patient,
+                status=data.get('status', 'Ongoing'),
+                complaints=data.get('complaints', []),
+                symptoms=data.get('symptoms', []),
+                pulse=data.get('pulse', ''),
+                spo2=data.get('spo2', ''),
+                respiration_rate=data.get('respiration_rate', ''),
+                blood_pressure=data.get('blood_pressure', ''),
+                temperature=data.get('temperature', ''),
+                dcap_btls=data.get('dcap_btls', []),
+                body_assessment=data.get('body_assessment', []),
+                medical_history_checkboxes=data.get('medical_history_checkboxes', []),
+                signs_symptoms=data.get('signs_symptoms', ''),
+                allergies=data.get('allergies', ''),
+                medications=data.get('medications', ''),
+                past_medical_history=data.get('past_medical_history', ''),
+                last_oral_intake=data.get('last_oral_intake', ''),
+                events_leading_to_incident=data.get('events_leading_to_incident', ''),
+                first_aid_notes=data.get('first_aid_notes', ''),
+                responder_name=data.get('responder_name', ''),
+                position=data.get('position', ''),
+                signature_data=data.get('signature_data', ''),
+                date_signed=timezone.now().date()
+            )
+            
+            return JsonResponse({'status': 'success', 'assessment_id': assessment.id, 'redirect_url': f'/first-aid/'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)})
+    return JsonResponse({'status': 'error', 'message': 'Invalid request'})

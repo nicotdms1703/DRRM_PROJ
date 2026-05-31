@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}View Assessment | SNSU DRRM{% endblock %}
+
+{% block content %}
+<div class="space-y-8 pb-12">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+        <div>
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Assessment Details
+            </h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Ref No: {{ assessment.assessment_number }}</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            <a href="{% url 'first_aid_dashboard' %}" class="btn-base bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all rounded-lg px-4 py-2 text-sm font-bold border border-slate-200 dark:border-slate-700">Back</a>
+            <a href="{% url 'first_aid_print' assessment.id %}" target="_blank" class="btn-base bg-rose-600 text-white hover:bg-rose-700 transition-all flex items-center space-x-2 rounded-lg px-4 py-2 text-sm font-bold shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                <span>Print / PDF</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="enterprise-card bg-white dark:bg-enterprise-darkCard border border-slate-200 dark:border-enterprise-darkBorder overflow-hidden">
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Patient Info -->
+                <div class="space-y-4">
+                    <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-2">Patient Information</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><span class="block text-[10px] text-slate-400 uppercase tracking-widest">Full Name</span><span class="text-sm font-bold text-slate-800 dark:text-white">{{ assessment.patient.full_name }}</span></div>
+                        <div><span class="block text-[10px] text-slate-400 uppercase tracking-widest">Age / Gender</span><span class="text-sm font-bold text-slate-800 dark:text-white">{{ assessment.patient.age }} / {{ assessment.patient.gender }}</span></div>
+                        <div><span class="block text-[10px] text-slate-400 uppercase tracking-widest">Program / Year</span><span class="text-sm font-bold text-slate-800 dark:text-white">{{ assessment.patient.program_year }}</span></div>
+                        <div><span class="block text-[10px] text-slate-400 uppercase tracking-widest">Cellphone</span><span class="text-sm font-bold text-slate-800 dark:text-white">{{ assessment.patient.cellphone_number }}</span></div>
+                    </div>
+                </div>
+                
+                <!-- Assessment Info -->
+                <div class="space-y-4">
+                    <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-2">Assessment Record</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><span class="block text-[10px] text-slate-400 uppercase tracking-widest">Date</span><span class="text-sm font-bold text-slate-800 dark:text-white">{{ assessment.date }}</span></div>
+                        <div><span class="block text-[10px] text-slate-400 uppercase tracking-widest">Time</span><span class="text-sm font-bold text-slate-800 dark:text-white">{{ assessment.time }}</span></div>
+                        <div><span class="block text-[10px] text-slate-400 uppercase tracking-widest">Status</span><span class="text-sm font-bold text-slate-800 dark:text-white">{{ assessment.status }}</span></div>
+                        <div><span class="block text-[10px] text-slate-400 uppercase tracking-widest">Responder</span><span class="text-sm font-bold text-slate-800 dark:text-white">{{ assessment.responder_name }}</span></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+                <div>
+                    <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-2 mb-4">Complaints</h3>
+                    <ul class="list-disc pl-4 text-sm text-slate-700 dark:text-slate-300 space-y-1">
+                        {% for c in assessment.complaints %}
+                            <li>{{ c }}</li>
+                        {% empty %}
+                            <li class="italic text-slate-400">None</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-2 mb-4">Symptoms</h3>
+                    <ul class="list-disc pl-4 text-sm text-slate-700 dark:text-slate-300 space-y-1">
+                        {% for s in assessment.symptoms %}
+                            <li>{{ s }}</li>
+                        {% empty %}
+                            <li class="italic text-slate-400">None</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <div class="mt-8">
+                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-2 mb-4">Vital Signs</h3>
+                <div class="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+                        <div><span class="block text-[10px] text-slate-400 uppercase tracking-widest">Pulse</span><span class="text-base font-bold text-slate-800 dark:text-white">{{ assessment.pulse|default:"-" }}</span></div>
+                        <div><span class="block text-[10px] text-slate-400 uppercase tracking-widest">SPO2</span><span class="text-base font-bold text-slate-800 dark:text-white">{{ assessment.spo2|default:"-" }}</span></div>
+                        <div><span class="block text-[10px] text-slate-400 uppercase tracking-widest">Respiration</span><span class="text-base font-bold text-slate-800 dark:text-white">{{ assessment.respiration_rate|default:"-" }}</span></div>
+                        <div><span class="block text-[10px] text-slate-400 uppercase tracking-widest">BP</span><span class="text-base font-bold text-slate-800 dark:text-white">{{ assessment.blood_pressure|default:"-" }}</span></div>
+                        <div><span class="block text-[10px] text-slate-400 uppercase tracking-widest">Temp</span><span class="text-base font-bold text-slate-800 dark:text-white">{{ assessment.temperature|default:"-" }}</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8">
+                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-2 mb-4">SAMPLE Assessment</h3>
+                <div class="space-y-3">
+                    <p class="text-sm"><span class="font-bold text-slate-800 dark:text-white">Medical History Checkboxes:</span> <span class="text-slate-600 dark:text-slate-400">{{ assessment.medical_history_checkboxes|join:", "|default:"None" }}</span></p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded border border-slate-100 dark:border-slate-800"><span class="font-bold text-rose-600">S:</span> <span class="text-slate-700 dark:text-slate-300">{{ assessment.signs_symptoms|default:"-" }}</span></div>
+                        <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded border border-slate-100 dark:border-slate-800"><span class="font-bold text-rose-600">A:</span> <span class="text-slate-700 dark:text-slate-300">{{ assessment.allergies|default:"-" }}</span></div>
+                        <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded border border-slate-100 dark:border-slate-800"><span class="font-bold text-rose-600">M:</span> <span class="text-slate-700 dark:text-slate-300">{{ assessment.medications|default:"-" }}</span></div>
+                        <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded border border-slate-100 dark:border-slate-800"><span class="font-bold text-rose-600">P:</span> <span class="text-slate-700 dark:text-slate-300">{{ assessment.past_medical_history|default:"-" }}</span></div>
+                        <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded border border-slate-100 dark:border-slate-800"><span class="font-bold text-rose-600">L:</span> <span class="text-slate-700 dark:text-slate-300">{{ assessment.last_oral_intake|default:"-" }}</span></div>
+                        <div class="bg-slate-50 dark:bg-slate-800/50 p-3 rounded border border-slate-100 dark:border-slate-800"><span class="font-bold text-rose-600">E:</span> <span class="text-slate-700 dark:text-slate-300">{{ assessment.events_leading_to_incident|default:"-" }}</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8">
+                <h3 class="text-xs font-black text-rose-500 uppercase tracking-widest border-b border-rose-100 dark:border-rose-900 pb-2 mb-4">First Aid Notes & Treatment</h3>
+                <div class="p-4 bg-rose-50 dark:bg-rose-900/10 rounded-xl border border-rose-100 dark:border-rose-900/30 text-sm text-slate-800 dark:text-slate-200">
+                    {{ assessment.first_aid_notes|linebreaks|default:"<span class='italic text-slate-400'>No treatment notes recorded.</span>" }}
+                </div>
+            </div>
+
+            <div class="mt-8">
+                <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 pb-2 mb-4">Injury Markers</h3>
+                <div class="flex flex-wrap gap-2">
+                    {% for ba in assessment.body_assessment %}
+                        <span class="px-3 py-1 bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-[11px] font-bold rounded-full border border-rose-200 dark:border-rose-800/50 uppercase tracking-widest shadow-sm">Marker {{ forloop.counter }}: {{ ba.desc }}</span>
+                    {% empty %}
+                        <span class="text-sm italic text-slate-400">No injury markers specified.</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

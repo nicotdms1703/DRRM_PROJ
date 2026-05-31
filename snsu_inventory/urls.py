@@ -6,3 +6,5 @@ urlpatterns = [
     path('', include('core.urls')),
     path('accounts/', include('django.contrib.auth.urls')),
 ]
+
+handler404 = 'core.views.custom_404'

@@ -39,13 +39,25 @@ class Item(models.Model):
         return f"{self.item_code}|{self.name}|{self.category}|{self.id}"
 
     def save(self, *args, **kwargs):
-        # Generate item_code if missing (e.g., DRRM-EQU-001)
+        # Ensure a unique item_code is generated if missing.
         if not self.item_code:
             prefix = "DRRM"
             cat_short = self.category[:3].upper()
-            count = Item.objects.filter(category=self.category).count() + 1
-            self.item_code = f"{prefix}-{cat_short}-{count:03d}"
+            # Find the highest numeric suffix for this category.
+            existing_codes = Item.objects.filter(category=self.category).values_list('item_code', flat=True)
+            max_num = 0
+            for code in existing_codes:
+                try:
+                    # Expected format: DRRM-XXX-###
+                    num_part = code.split('-')[-1]
+                    num = int(num_part)
+                    if num > max_num:
+                        max_num = num
+                except Exception:
+                    continue
+            self.item_code = f"{prefix}-{cat_short}-{max_num + 1:03d}"
         
+        # Preserve existing logic for status and other fields.
         if not self.barcode:
             self.barcode = self.item_code
 
@@ -130,6 +142,8 @@ class Borrowing(models.Model):
 
     def __str__(self):
         return f"{self.borrower_name} borrowed {self.item.name}"
+
+
 
 class ActivityLog(models.Model):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
@@ -383,3 +397,123 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.get_notification_type_display()} - {self.title}"
+
+
+# RESPONDER ATTENDANCE MODELS
+class Responder(models.Model):
+    name = models.CharField(max_length=150)
+    registration_no = models.CharField(max_length=100, unique=True, help_text="e.g. BLSHP-24-DOHCaraga-5407")
+    qr_payload = models.CharField(max_length=255, unique=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.qr_payload:
+            self.qr_payload = self.registration_no
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name} ({self.registration_no})"
+
+class ResponderLog(models.Model):
+    responder = models.ForeignKey(Responder, on_delete=models.CASCADE, related_name='logs')
+    login_time = models.DateTimeField(default=timezone.now)
+    logout_time = models.DateTimeField(null=True, blank=True)
+    total_duration_seconds = models.IntegerField(default=0)
+    
+    @property
+    def formatted_duration(self):
+        if not self.logout_time:
+            return "Active"
+        sec = self.total_duration_seconds
+        h = sec // 3600
+        m = (sec % 3600) // 60
+        s = sec % 60
+        
+        parts = []
+        if h > 0:
+            parts.append(f"{h}h")
+        if m > 0:
+            parts.append(f"{m}m")
+        if s > 0 or not parts:
+            parts.append(f"{s}s")
+        return " ".join(parts)
+    
+    def __str__(self):
+        return f"{self.responder.name} Log - {self.login_time.date()}"
+
+
+# PATIENT ASSESSMENT MODELS
+class Patient(models.Model):
+    full_name = models.CharField(max_length=200)
+    gender = models.CharField(max_length=20, choices=[('Male', 'Male'), ('Female', 'Female'), ('Other', 'Other')])
+    age = models.IntegerField()
+    cellphone_number = models.CharField(max_length=20)
+    address = models.TextField()
+    program_year = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.full_name
+
+class PatientAssessment(models.Model):
+    STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('Ongoing', 'Ongoing'),
+        ('Completed', 'Completed'),
+    ]
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='assessments')
+    assessment_number = models.CharField(max_length=50, unique=True, blank=True)
+    date = models.DateField(default=timezone.now)
+    time = models.TimeField(default=timezone.now)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Ongoing')
+    
+    # Section C - Complaints (Store as list of strings)
+    complaints = models.JSONField(default=list, blank=True)
+    
+    # Section D - Symptoms (Store as list of strings)
+    symptoms = models.JSONField(default=list, blank=True)
+    
+    # Section E - Vital Signs
+    pulse = models.CharField(max_length=50, blank=True)
+    spo2 = models.CharField(max_length=50, blank=True)
+    respiration_rate = models.CharField(max_length=50, blank=True)
+    blood_pressure = models.CharField(max_length=50, blank=True)
+    temperature = models.CharField(max_length=50, blank=True)
+    
+    # Section F - DCAP-BTLS (Store as list of dicts: {'item': 'Deformities', 'remarks': '...'})
+    dcap_btls = models.JSONField(default=list, blank=True)
+    
+    # Section G - Body Injury Diagram (Store coordinates & notes)
+    body_assessment = models.JSONField(default=list, blank=True)
+    
+    # Section H - SAMPLE Assessment
+    medical_history_checkboxes = models.JSONField(default=list, blank=True)
+    signs_symptoms = models.TextField(blank=True)
+    allergies = models.TextField(blank=True)
+    medications = models.TextField(blank=True)
+    past_medical_history = models.TextField(blank=True)
+    last_oral_intake = models.TextField(blank=True)
+    events_leading_to_incident = models.TextField(blank=True)
+    
+    # Section I - First Aid Notes
+    first_aid_notes = models.TextField(blank=True)
+    
+    # Section J - Attending Personnel
+    responder_name = models.CharField(max_length=200, blank=True)
+    position = models.CharField(max_length=100, blank=True)
+    signature_data = models.TextField(blank=True)
+    date_signed = models.DateField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if not self.assessment_number:
+            current_year = timezone.now().year
+            count = PatientAssessment.objects.filter(assessment_number__startswith=f'OFA-{current_year}').count()
+            self.assessment_number = f"OFA-{current_year}-{(count + 1):06d}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.assessment_number} - {self.patient.full_name}"

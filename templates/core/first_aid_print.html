@@ -1,0 +1,448 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Patient Assessment - {{ assessment.assessment_number }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10px;
+            color: #000;
+            background: #fff;
+            padding: 15px 20px;
+        }
+
+        /* --- PRINT BUTTON (hidden on print) --- */
+        .no-print {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 8px;
+        }
+        .no-print button, .no-print a {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        .btn-print { background: #2D6A4F; color: white; }
+        .btn-back  { background: #e5e7eb; color: #333; }
+        @media print { .no-print { display: none !important; } }
+
+        /* --- PAGE HEADER --- */
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 3px solid #2D6A4F;
+            padding-bottom: 8px;
+            margin-bottom: 6px;
+        }
+        .header-logos { display: flex; align-items: center; gap: 8px; }
+        .header-logos img { height: 50px; }
+        .header-text { text-align: center; flex: 1; }
+        .header-text .univ-name {
+            font-size: 13px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .header-text .univ-sub { font-size: 9px; color: #444; }
+        .header-right { display: flex; gap: 6px; align-items: center; }
+        .header-right img { height: 40px; }
+
+        .form-title-block { text-align: center; padding: 5px 0 4px; border-bottom: 1px solid #ccc; margin-bottom: 6px; }
+        .form-title-block .drrm { font-size: 12px; font-weight: 900; color: #2D6A4F; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-title-block .ofa  { font-size: 14px; font-weight: 900; color: #c0392b; text-transform: uppercase; letter-spacing: 1px; }
+        .form-title-block .paf  { font-size: 11px; font-weight: 700; text-transform: uppercase; }
+
+        /* --- TABLE HELPERS --- */
+        table { width: 100%; border-collapse: collapse; }
+        td, th { border: 1px solid #444; padding: 3px 5px; vertical-align: top; }
+        th { background: #f5f5f5; font-weight: 700; text-align: center; }
+
+        /* --- SECTION HEADER --- */
+        .section-header {
+            background: #f0f0f0;
+            font-weight: 900;
+            font-size: 10px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 3px 5px;
+            border: 1px solid #444;
+            border-bottom: none;
+        }
+
+        .label { font-weight: 700; font-size: 9px; text-transform: uppercase; color: #333; }
+        .value { font-size: 11px; min-height: 16px; }
+        
+        /* --- RESPONSIVE BODY DIAGRAM AREA --- */
+        .body-diagram-area {
+            display: flex;
+            gap: 0;
+        }
+        .dcap-table { flex: 1; }
+        .body-figure {
+            flex: 0 0 180px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 4px;
+        }
+
+        /* --- FOOTER --- */
+        .page-footer {
+            margin-top: 10px;
+            border-top: 2px solid #2D6A4F;
+            padding-top: 5px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 8px;
+            color: #555;
+        }
+
+        .checked { font-weight: 700; }
+        .unchecked { color: #999; }
+
+        .signature-row td { height: 45px; text-align: center; vertical-align: bottom; font-size: 9px; font-weight: 700; }
+        .sig-line { border-top: 1px solid #000; width: 80%; margin: 0 auto 2px; }
+    </style>
+</head>
+<body>
+
+<!-- Print Button -->
+<div class="no-print">
+    <button class="btn-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    <a class="btn-back" href="{% url 'first_aid_dashboard' %}">← Back</a>
+</div>
+
+<!-- Page Header -->
+<div style="width: 100%; text-align: center; margin-bottom: 10px;">
+    <img src="{% static 'img/first_aid_header.png' %}" style="width: 100%; max-width: 100%; display: block;" alt="SNSU Header"/>
+</div>
+
+<!-- Form Title -->
+<div class="form-title-block">
+    <div class="drrm">Disaster Risk Reduction Management Office</div>
+    <div class="ofa">Occupational First Aid</div>
+    <div class="paf">Patient Assessment Form</div>
+</div>
+
+<!-- DATE & TIME -->
+<table style="margin-bottom:4px;">
+    <tr>
+        <td style="width:50%; border-right:1px solid #444;">
+            <span class="label">📅 Date:</span>&nbsp;
+            <span class="value">{{ assessment.date|date:"F d, Y" }}</span>
+        </td>
+        <td style="width:50%;">
+            <span class="label">🕐 Time:</span>&nbsp;
+            <span class="value">{{ assessment.time|time:"h:i A" }}</span>
+        </td>
+    </tr>
+</table>
+
+<!-- PATIENT'S INFORMATION -->
+<div class="section-header">Patient's Information</div>
+<table style="margin-bottom:4px;">
+    <tr>
+        <td colspan="3">
+            <div class="label">Name:</div>
+            <div class="value">{{ assessment.patient.full_name }}</div>
+        </td>
+        <td colspan="2">
+            <div class="label">Gender:</div>
+            <div class="value">{{ assessment.patient.gender }}</div>
+        </td>
+    </tr>
+    <tr>
+        <td style="width:15%;">
+            <div class="label">Age:</div>
+            <div class="value">{{ assessment.patient.age }}</div>
+        </td>
+        <td colspan="2">
+            <div class="label">Cellphone #:</div>
+            <div class="value">{{ assessment.patient.cellphone_number }}</div>
+        </td>
+        <td colspan="2">
+            <div class="label">Program/Year:</div>
+            <div class="value">{{ assessment.patient.program_year }}</div>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="5">
+            <div class="label">Address:</div>
+            <div class="value">{{ assessment.patient.address|default:"—" }}</div>
+        </td>
+    </tr>
+</table>
+
+<!-- COMPLAINTS + SYMPTOMS + VITAL SIGNS side by side -->
+<table style="margin-bottom:4px;">
+    <thead>
+        <tr>
+            <th style="width:35%;">Student Complaint</th>
+            <th style="width:30%;">Symptoms</th>
+            <th style="width:35%;">Vital Signs</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% with c_list=assessment.complaints %}
+        <tr>
+            <!-- Row 1 -->
+            <td>1. {% if c_list|length >= 1 %}{{ c_list.0 }}{% endif %}</td>
+            <td>Vomiting {% if "Vomiting" in assessment.symptoms %}✅{% endif %}</td>
+            <td><span class="label">Pulse:</span> {{ assessment.pulse|default:"" }}</td>
+        </tr>
+        <tr>
+            <td>2. {% if c_list|length >= 2 %}{{ c_list.1 }}{% endif %}</td>
+            <td>Headache {% if "Headache" in assessment.symptoms %}✅{% endif %}</td>
+            <td><span class="label">SPO2:</span> {{ assessment.spo2|default:"" }}</td>
+        </tr>
+        <tr>
+            <td>3. {% if c_list|length >= 3 %}{{ c_list.2 }}{% endif %}</td>
+            <td>Dizziness {% if "Dizziness" in assessment.symptoms %}✅{% endif %}</td>
+            <td><span class="label">Resp.:</span> {{ assessment.respiration_rate|default:"" }}</td>
+        </tr>
+        <tr>
+            <td>4. {% if c_list|length >= 4 %}{{ c_list.3 }}{% endif %}</td>
+            <td>Stomach Pain {% if "Stomach Pain" in assessment.symptoms %}✅{% endif %}</td>
+            <td><span class="label">BP:</span> {{ assessment.blood_pressure|default:"" }}</td>
+        </tr>
+        <tr>
+            <td>5. {% if c_list|length >= 5 %}{{ c_list.4 }}{% endif %}</td>
+            <td>Chest Pain {% if "Chest Pain" in assessment.symptoms %}✅{% endif %}</td>
+            <td><span class="label">Temp.:</span> {{ assessment.temperature|default:"" }}</td>
+        </tr>
+        <tr>
+            <td>6. {% if c_list|length >= 6 %}{{ c_list.5 }}{% endif %}</td>
+            <td>Hyperventilation {% if "Hyperventilation" in assessment.symptoms %}✅{% endif %}</td>
+            <td></td>
+        </tr>
+        <tr>
+            <td></td>
+            <td>Allergy {% if "Allergy" in assessment.symptoms %}✅{% endif %}</td>
+            <td></td>
+        </tr>
+        {% endwith %}
+    </tbody>
+</table>
+
+<!-- PATIENT BODY ASSESSMENT (DCAP-BTLS + body diagram) -->
+<div class="section-header">Patient's Physical Assessment</div>
+<div class="body-diagram-area" style="border:1px solid #444; margin-bottom:4px;">
+    <!-- DCAP-BTLS Table -->
+    <table class="dcap-table" style="border:none; border-right:1px solid #444;">
+        <tr>
+            <td style="border:none; border-bottom:1px solid #ddd;"><b>D</b> – Deformities</td>
+            <td style="border:none; border-bottom:1px solid #ddd; width:80px;">
+                {% for ba in assessment.body_assessment %}{% if "deform" in ba.desc|lower %}{{ ba.desc }}{% endif %}{% endfor %}
+            </td>
+        </tr>
+        <tr>
+            <td style="border:none; border-bottom:1px solid #ddd;"><b>C</b> – Contusions</td>
+            <td style="border:none; border-bottom:1px solid #ddd;">
+                {% for ba in assessment.body_assessment %}{% if "contus" in ba.desc|lower %}{{ ba.desc }}{% endif %}{% endfor %}
+            </td>
+        </tr>
+        <tr>
+            <td style="border:none; border-bottom:1px solid #ddd;"><b>A</b> – Abrasions</td>
+            <td style="border:none; border-bottom:1px solid #ddd;">
+                {% for ba in assessment.body_assessment %}{% if "abras" in ba.desc|lower %}{{ ba.desc }}{% endif %}{% endfor %}
+            </td>
+        </tr>
+        <tr>
+            <td style="border:none; border-bottom:1px solid #ddd;"><b>P</b> – Puncture/Penetration</td>
+            <td style="border:none; border-bottom:1px solid #ddd;">
+                {% for ba in assessment.body_assessment %}{% if "puncture" in ba.desc|lower or "penetr" in ba.desc|lower %}{{ ba.desc }}{% endif %}{% endfor %}
+            </td>
+        </tr>
+        <tr>
+            <td style="border:none; border-bottom:1px solid #ddd;"><b>B</b> – Burns</td>
+            <td style="border:none; border-bottom:1px solid #ddd;">
+                {% for ba in assessment.body_assessment %}{% if "burn" in ba.desc|lower %}{{ ba.desc }}{% endif %}{% endfor %}
+            </td>
+        </tr>
+        <tr>
+            <td style="border:none; border-bottom:1px solid #ddd;"><b>T</b> – Tenderness</td>
+            <td style="border:none; border-bottom:1px solid #ddd;">
+                {% for ba in assessment.body_assessment %}{% if "tender" in ba.desc|lower %}{{ ba.desc }}{% endif %}{% endfor %}
+            </td>
+        </tr>
+        <tr>
+            <td style="border:none; border-bottom:1px solid #ddd;"><b>L</b> – Lacerations</td>
+            <td style="border:none; border-bottom:1px solid #ddd;">
+                {% for ba in assessment.body_assessment %}{% if "lacerat" in ba.desc|lower %}{{ ba.desc }}{% endif %}{% endfor %}
+            </td>
+        </tr>
+        <tr>
+            <td style="border:none; border-bottom:1px solid #ddd;"><b>S</b> – Swelling</td>
+            <td style="border:none; border-bottom:1px solid #ddd;">
+                {% for ba in assessment.body_assessment %}{% if "swell" in ba.desc|lower %}{{ ba.desc }}{% endif %}{% endfor %}
+            </td>
+        </tr>
+        <tr>
+            <td style="border:none; border-bottom:1px solid #ddd;"><b>B</b> – Bleeding</td>
+            <td style="border:none; border-bottom:1px solid #ddd;">
+                {% for ba in assessment.body_assessment %}{% if "bleed" in ba.desc|lower %}{{ ba.desc }}{% endif %}{% endfor %}
+            </td>
+        </tr>
+        <tr>
+            <td style="border:none;"><b>P</b> – Pain</td>
+            <td style="border:none;">
+                {% for ba in assessment.body_assessment %}{% if "pain" in ba.desc|lower %}{{ ba.desc }}{% endif %}{% endfor %}
+            </td>
+        </tr>
+    </table>
+    <!-- Human Body Figures (inline SVG front & back) -->
+    <div class="body-figure" style="gap:10px;">
+        <!-- Front Figure -->
+        <svg width="70" height="140" viewBox="0 0 70 160" xmlns="http://www.w3.org/2000/svg" style="overflow:visible;">
+            <text x="35" y="8" text-anchor="middle" font-size="7" font-weight="bold" fill="#555">Front</text>
+            <!-- Head -->
+            <ellipse cx="35" cy="25" rx="13" ry="15" fill="#d4956a" stroke="#7a5c3a" stroke-width="1.2"/>
+            <!-- Neck -->
+            <rect x="30" y="38" width="10" height="8" fill="#d4956a" stroke="#7a5c3a" stroke-width="1"/>
+            <!-- Torso -->
+            <rect x="18" y="46" width="34" height="45" rx="4" fill="#d4956a" stroke="#7a5c3a" stroke-width="1.2"/>
+            <!-- Left Arm -->
+            <rect x="5" y="46" width="12" height="40" rx="6" fill="#d4956a" stroke="#7a5c3a" stroke-width="1"/>
+            <!-- Right Arm -->
+            <rect x="53" y="46" width="12" height="40" rx="6" fill="#d4956a" stroke="#7a5c3a" stroke-width="1"/>
+            <!-- Left Leg -->
+            <rect x="18" y="91" width="14" height="55" rx="5" fill="#d4956a" stroke="#7a5c3a" stroke-width="1"/>
+            <!-- Right Leg -->
+            <rect x="38" y="91" width="14" height="55" rx="5" fill="#d4956a" stroke="#7a5c3a" stroke-width="1"/>
+            <!-- Center line -->
+            <line x1="35" y1="46" x2="35" y2="91" stroke="#7a5c3a" stroke-width="0.6" stroke-dasharray="2,2"/>
+        </svg>
+        <!-- Back Figure -->
+        <svg width="70" height="140" viewBox="0 0 70 160" xmlns="http://www.w3.org/2000/svg" style="overflow:visible;">
+            <text x="35" y="8" text-anchor="middle" font-size="7" font-weight="bold" fill="#555">Back</text>
+            <!-- Head -->
+            <ellipse cx="35" cy="25" rx="13" ry="15" fill="#c07a4a" stroke="#7a5c3a" stroke-width="1.2"/>
+            <!-- Neck -->
+            <rect x="30" y="38" width="10" height="8" fill="#c07a4a" stroke="#7a5c3a" stroke-width="1"/>
+            <!-- Torso -->
+            <rect x="18" y="46" width="34" height="45" rx="4" fill="#c07a4a" stroke="#7a5c3a" stroke-width="1.2"/>
+            <!-- Left Arm -->
+            <rect x="5" y="46" width="12" height="40" rx="6" fill="#c07a4a" stroke="#7a5c3a" stroke-width="1"/>
+            <!-- Right Arm -->
+            <rect x="53" y="46" width="12" height="40" rx="6" fill="#c07a4a" stroke="#7a5c3a" stroke-width="1"/>
+            <!-- Left Leg -->
+            <rect x="18" y="91" width="14" height="55" rx="5" fill="#c07a4a" stroke="#7a5c3a" stroke-width="1"/>
+            <!-- Right Leg -->
+            <rect x="38" y="91" width="14" height="55" rx="5" fill="#c07a4a" stroke="#7a5c3a" stroke-width="1"/>
+            <!-- Center line -->
+            <line x1="35" y1="46" x2="35" y2="91" stroke="#7a5c3a" stroke-width="0.6" stroke-dasharray="2,2"/>
+        </svg>
+    </div>
+</div>
+
+<!-- INJURY MARKERS NOTE (from body diagram clicks) -->
+{% if assessment.body_assessment %}
+<div style="border:1px solid #ccc; border-top:none; padding:4px 6px; font-size:9px; margin-bottom:4px; background:#fffde7;">
+    <b>Injury Notes:</b>
+    {% for ba in assessment.body_assessment %}
+      <span style="margin-right:10px;">📍 Marker {{ forloop.counter }}: {{ ba.desc }}</span>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- SAMPLE -->
+<div class="section-header">Sample</div>
+<table style="margin-bottom:4px;">
+    <tr>
+        <th style="width:50%;">Past Medical History</th>
+        <th style="width:50%;">Legend</th>
+    </tr>
+    <tr>
+        <td>
+            {% if "Cardiac" in assessment.medical_history_checkboxes %}
+            ☑ CARDIAC
+            {% else %}
+            ☐ CARDIAC
+            {% endif %}
+        </td>
+        <td><b>S</b> – Signs and Symptoms</td>
+    </tr>
+    <tr>
+        <td>
+            {% if "Epilepsy" in assessment.medical_history_checkboxes %}
+            ☑ EPILEPSY
+            {% else %}
+            ☐ EPILEPSY
+            {% endif %}
+        </td>
+        <td><b>A</b> – Allergies</td>
+    </tr>
+    <tr>
+        <td>
+            {% if "Hypertension" in assessment.medical_history_checkboxes %}
+            ☑ HYPERTENSION
+            {% else %}
+            ☐ HYPERTENSION
+            {% endif %}
+        </td>
+        <td><b>M</b> – Medications</td>
+    </tr>
+    <tr>
+        <td>
+            {% if "Asthma" in assessment.medical_history_checkboxes %}
+            ☑ ASTHMA
+            {% else %}
+            ☐ ASTHMA
+            {% endif %}
+        </td>
+        <td><b>P</b> – Past Medical History</td>
+    </tr>
+    <tr>
+        <td>
+            {% if "Loss of Consciousness" in assessment.medical_history_checkboxes %}
+            ☑ LOSS OF CONSCIOUSNESS
+            {% else %}
+            ☐ LOSS OF CONSCIOUSNESS
+            {% endif %}
+        </td>
+        <td><b>L</b> – Last oral intake</td>
+    </tr>
+    <tr>
+        <td>☐ OTHERS: ____________________________</td>
+        <td><b>E</b> – Events leading</td>
+    </tr>
+</table>
+
+<!-- SAMPLE Detail Fill-in -->
+<table style="margin-bottom:4px;">
+    <tr>
+        <td style="width:15%; font-weight:700; background:#f9f9f9;">S:</td>
+        <td>{{ assessment.signs_symptoms|default:"&nbsp;" }}</td>
+        <td style="width:15%; font-weight:700; background:#f9f9f9;">A:</td>
+        <td>{{ assessment.allergies|default:"&nbsp;" }}</td>
+    </tr>
+    <tr>
+        <td style="font-weight:700; background:#f9f9f9;">M:</td>
+        <td>{{ assessment.medications|default:"&nbsp;" }}</td>
+        <td style="font-weight:700; background:#f9f9f9;">P:</td>
+        <td>{{ assessment.past_medical_history|default:"&nbsp;" }}</td>
+    </tr>
+    <tr>
+        <td style="font-weight:700; background:#f9f9f9;">L:</td>
+        <td>{{ assessment.last_oral_intake|default:"&nbsp;" }}</td>
+        <td style="font-weight:700; background:#f9f9f9;">E:</td>
+        <td>{{ assessment.events_leading_to_incident|default:"&nbsp;" }}</td>
+    </tr>
+</table>
+
+<!-- PAGE FOOTER -->
+<div style="width: 100%; text-align: center; margin-top: 15px;">
+    <img src="{% static 'img/first_aid_footer.png' %}" style="width: 100%; max-width: 100%; display: block;" alt="SNSU Footer"/>
+</div>
+
+</body>
+</html>
